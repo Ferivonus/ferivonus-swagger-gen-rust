@@ -8,11 +8,8 @@ Say goodbye to manually writing OpenAPI schemas! `ferivonus-swagger-gen` automat
 
 Add the following to your `Cargo.toml`:
 
-```toml
-[dependencies]
-actix-web = "4"
-serde = { version = "1.0", features = ["derive"] }
-ferivonus-swagger-gen = "0.1.1"
+```ps1
+cargo add actix-web@4 serde --features derive ferivonus-swagger-gen
 ```
 
 ## Quick Start (Example)

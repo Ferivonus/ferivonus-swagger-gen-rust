@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "ferivonus-swagger-gen"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "actix-web",
  "ferivonus-macros",
