@@ -1,94 +1,219 @@
-//! This example demonstrates a complete Actix-web server integrated with the Ferivonus engine.
-//! It covers basic routes, query parameters, and structured JSON responses.
-
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, web};
-use ferivonus_swagger_gen::{ApiRegistry, ferivonus_config, register_api};
+use actix_web::{
+    App, HttpRequest, HttpResponse, HttpServer, Responder, delete, get, post, put, web,
+};
+use ferivonus_swagger_gen::{ApiRegistry, ApiSchema, ferivonus_config, register_api};
 use serde::{Deserialize, Serialize};
 
-/// Request schema for mathematical operations.
-#[derive(Deserialize)]
-struct MathQuery {
-    a: i32,
-    b: i32,
+// =====================================================================
+// 📦 1. VERİ MODELLERİ (SCHEMAS)
+// =====================================================================
+
+#[derive(Serialize, Deserialize, Clone, ApiSchema)]
+enum Role {
+    Admin,
+    User,
+    Guest,
 }
 
-/// Request schema for database search queries.
-#[derive(Deserialize)]
-struct SearchQuery {
-    q: String,
-    limit: u32,
+#[derive(Deserialize, ApiSchema)]
+struct UserCreateRequest {
+    username: String,
+    age: i32,
+    role: Role,
 }
 
-/// Response schema for user data.
-#[derive(Serialize)]
-struct User {
+#[derive(Deserialize, ApiSchema)]
+struct UserUpdateRequest {
+    role: Role,
+}
+
+#[derive(Serialize, ApiSchema)]
+struct UserResponse {
     id: u32,
     username: String,
-    role: String,
+    role: Role,
 }
 
-#[register_api(summary = "Root index providing basic engine information")]
-#[get("/")]
-async fn index() -> impl Responder {
-    HttpResponse::Ok().json(serde_json::json!({ "message": "Ferivonus API Engine is running" }))
+#[derive(Serialize, ApiSchema)]
+struct ErrorResponse {
+    error_code: String,
+    message: String,
 }
 
-#[register_api(summary = "Health check endpoint for monitoring system status")]
-#[get("/status")]
-async fn status() -> impl Responder {
-    HttpResponse::Ok().json(serde_json::json!({ "status": "Operational", "uptime": "99.9%" }))
-}
+// =====================================================================
+// 🛡️ 2. SİSTEM & SAĞLIK KONTROLÜ (SYSTEM ROUTES)
+// =====================================================================
 
 #[register_api(
-    summary = "Performs addition on two integers",
-    params = "a:integer, b:integer"
+    summary = "Sistemin ayakta olup olmadığını kontrol eder",
+    tags = "Sistem",
+    // Overload ile sadece 200 dönmesini sağlıyoruz, hata beklemiyoruz.
+    overload_responses = "200:string"
 )]
-#[get("/math/add")]
-async fn add(query: web::Query<MathQuery>) -> impl Responder {
-    HttpResponse::Ok().json(serde_json::json!({ "result": query.a + query.b }))
+#[get("/health")]
+async fn health_check() -> impl Responder {
+    HttpResponse::Ok().body("Ferivonus Engine is up and running! 🚀")
 }
+
+// =====================================================================
+// 👑 3. ADMİN İŞLEMLERİ (ADMIN ROUTES - KORUMALI)
+// =====================================================================
 
 #[register_api(
-    summary = "Performs multiplication on two integers",
-    params = "a:integer, b:integer"
+    summary = "Sistem yöneticisinin profilini getirir",
+    tags = "Admin İşlemleri",
+    security = "Bearer", // 🔒 KİLİTLİ
+    response_model = "UserResponse"
 )]
-#[get("/math/multiply")]
-async fn multiply(query: web::Query<MathQuery>) -> impl Responder {
-    HttpResponse::Ok().json(serde_json::json!({ "result": query.a * query.b }))
-}
-
-#[register_api(
-    summary = "Simulates a search operation with query limits",
-    params = "q:string, limit:integer"
-)]
-#[get("/search")]
-async fn search(query: web::Query<SearchQuery>) -> impl Responder {
-    HttpResponse::Ok().json(serde_json::json!({
-        "query": query.q,
-        "returned_items": query.limit,
-        "data": []
-    }))
-}
-
-#[register_api(summary = "Returns the profile data for the system administrator")]
 #[get("/users/admin")]
-async fn get_admin_profile() -> impl Responder {
-    let user = User {
-        id: 777,
-        username: "ferivonus_root".to_string(),
-        role: "superuser".to_string(),
-    };
-    HttpResponse::Ok().json(user)
+async fn get_admin_profile(req: HttpRequest) -> impl Responder {
+    let auth_header = req.headers().get("Authorization");
+
+    match auth_header {
+        Some(token) if token.to_str().unwrap_or("") == "Bearer ferivonus_secret_token" => {
+            HttpResponse::Ok().json(UserResponse {
+                id: 777,
+                username: "ferivonus_root".to_string(),
+                role: Role::Admin,
+            })
+        }
+        _ => HttpResponse::Unauthorized().json(ErrorResponse {
+            error_code: "UNAUTHORIZED".to_string(),
+            message: "Geçerli bir Bearer Token gerekli.".to_string(),
+        }),
+    }
 }
+
+#[register_api(
+    summary = "Kullanıcıyı sistemden siler (Sadece Admin)",
+    tags = "Admin İşlemleri",
+    security = "Bearer", // 🔒 KİLİTLİ
+    params = "id:integer", // 📌 PATH PARAMETRESİ
+    overload_responses = "204:string, 401:ErrorResponse, 404:ErrorResponse"
+)]
+#[delete("/users/{id}")]
+async fn delete_user(path: web::Path<u32>, req: HttpRequest) -> impl Responder {
+    let auth_header = req.headers().get("Authorization");
+    if auth_header.is_none()
+        || auth_header.unwrap().to_str().unwrap_or("") != "Bearer ferivonus_secret_token"
+    {
+        return HttpResponse::Unauthorized().json(ErrorResponse {
+            error_code: "UNAUTHORIZED".to_string(),
+            message: "Silme işlemi için yetkiniz yok.".to_string(),
+        });
+    }
+
+    let user_id = path.into_inner();
+    println!("🗑️ Kullanıcı silindi. ID: {}", user_id);
+
+    // 204 No Content -> Başarılı ama içerik dönmeye gerek yok
+    HttpResponse::NoContent().finish()
+}
+
+// =====================================================================
+// 👥 4. KULLANICI İŞLEMLERİ (USER ROUTES - HALKA AÇIK)
+// =====================================================================
+
+#[derive(Deserialize)]
+struct PaginationQuery {
+    limit: Option<u32>,
+}
+
+#[register_api(
+    summary = "Tüm kullanıcıları listeler (Sayfalamalı)",
+    tags = "Kullanıcı İşlemleri",
+    params = "limit:integer", // 🔍 QUERY PARAMETRESİ
+    overload_responses = "200:string"
+)]
+#[get("/users")]
+async fn list_users(query: web::Query<PaginationQuery>) -> impl Responder {
+    let limit = query.limit.unwrap_or(10);
+    println!("📋 {} adet kullanıcı listeleniyor...", limit);
+
+    // Basitlik adına JSON array yerine mesaj dönüyoruz
+    HttpResponse::Ok().body(format!("{} adet kullanıcı başarıyla getirildi.", limit))
+}
+
+#[register_api(
+    summary = "ID'ye göre kullanıcı detayını getirir",
+    tags = "Kullanıcı İşlemleri",
+    params = "id:integer", // 📌 PATH PARAMETRESİ
+    response_model = "UserResponse"
+)]
+#[get("/users/{id}")]
+async fn get_user(path: web::Path<u32>) -> impl Responder {
+    let user_id = path.into_inner();
+
+    // Örnek: Eğer ID 0 gelirse 404 dön
+    if user_id == 0 {
+        return HttpResponse::NotFound().json(ErrorResponse {
+            error_code: "NOT_FOUND".to_string(),
+            message: "Kullanıcı bulunamadı.".to_string(),
+        });
+    }
+
+    HttpResponse::Ok().json(UserResponse {
+        id: user_id,
+        username: format!("user_{}", user_id),
+        role: Role::User,
+    })
+}
+
+#[register_api(
+    summary = "Yeni kullanıcı oluşturur",
+    tags = "Kullanıcı İşlemleri",
+    request_body = "UserCreateRequest",
+    overload_responses = "201:UserResponse, 400:ErrorResponse"
+)]
+#[post("/users")]
+async fn create_user(body: web::Json<UserCreateRequest>) -> impl Responder {
+    if body.age < 18 {
+        return HttpResponse::BadRequest().json(ErrorResponse {
+            error_code: "AGE_RESTRICTION".to_string(),
+            message: "Kayıt olmak için 18 yaşından büyük olmalısınız.".to_string(),
+        });
+    }
+
+    HttpResponse::Created().json(UserResponse {
+        id: 101, // Mock ID
+        username: body.username.clone(),
+        role: body.role.clone(),
+    })
+}
+
+#[register_api(
+    summary = "Kullanıcının rolünü günceller",
+    tags = "Kullanıcı İşlemleri",
+    params = "id:integer", // 📌 PATH PARAMETRESİ
+    request_body = "UserUpdateRequest",
+    response_model = "UserResponse"
+)]
+#[put("/users/{id}/role")]
+async fn update_user_role(
+    path: web::Path<u32>,
+    body: web::Json<UserUpdateRequest>,
+) -> impl Responder {
+    let user_id = path.into_inner();
+
+    println!("🔄 Kullanıcı ({}) rolü güncellendi.", user_id);
+
+    HttpResponse::Ok().json(UserResponse {
+        id: user_id,
+        username: format!("user_{}", user_id),
+        role: body.role.clone(),
+    })
+}
+
+// =====================================================================
+// 🚀 5. SUNUCU BAŞLATMA (SERVER ENTRY POINT)
+// =====================================================================
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let addr = "127.0.0.1:8080";
 
-    // Initialize the Ferivonus registry to collect all registered routes
+    // Registry başlatılıyor (Inventory ile toplanan rotalar JSON'a çevrilir)
     let registry = ApiRegistry::new();
-
-    // Print interface URLs to the console on startup
     registry.print_startup_info(addr);
 
     let registry_data = web::Data::new(registry);
@@ -96,15 +221,18 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(registry_data.clone())
-            // Configure Ferivonus internal routes (/fer-ui and /ferivonus.json)
+            // Swagger ve JSON Rotaları
             .configure(ferivonus_config)
-            // Register application services
-            .service(index)
-            .service(status)
-            .service(add)
-            .service(multiply)
-            .service(search)
+            // Sistem Rotaları
+            .service(health_check)
+            // Admin Rotaları
             .service(get_admin_profile)
+            .service(delete_user)
+            // Kullanıcı Rotaları
+            .service(list_users)
+            .service(get_user)
+            .service(create_user)
+            .service(update_user_role)
     })
     .bind(addr)?
     .run()

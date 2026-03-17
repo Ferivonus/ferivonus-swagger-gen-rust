@@ -1,6 +1,6 @@
 [package]
 name = "ferivonus-macros"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2024"
 description = "Procedural macros for the Ferivonus documentation engine."
 license = "MIT"
