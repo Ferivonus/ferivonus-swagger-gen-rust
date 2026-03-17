@@ -8,18 +8,12 @@ pub use ferivonus_macros::{ApiSchema, register_api};
 pub const UI_PATH: &str = "/fer-ui/";
 pub const SPEC_PATH: &str = "/ferivonus.json";
 
-// =====================================================================
-// 🚨 YERLEŞİK HATA YÖNETİMİ (BUILT-IN ERROR HANDLING)
-// =====================================================================
-
-/// Kütüphanenin standart JSON hata modeli
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ErrorResponse {
     pub error_code: String,
     pub message: String,
 }
 
-// Swagger'a ErrorResponse'u tanıtıyoruz (Manuel olarak içeri aktarıyoruz)
 inventory::submit! {
     SchemaPlugin {
         name: "ErrorResponse",
@@ -31,7 +25,6 @@ inventory::submit! {
     }
 }
 
-/// Geliştiricilerin endpoint'lerde fırlatacağı standart Api Hata Enum'ı
 #[derive(Debug)]
 pub enum ApiError {
     Unauthorized(String),
@@ -75,10 +68,6 @@ impl ResponseError for ApiError {
         })
     }
 }
-
-// =====================================================================
-// ⚙️ ÇEKİRDEK YAPILAR (CORE REGISTRY & PLUGINS)
-// =====================================================================
 
 #[doc(hidden)]
 pub struct RoutePlugin {
@@ -192,10 +181,6 @@ pub fn ferivonus_config(cfg: &mut web::ServiceConfig) {
     cfg.route(SPEC_PATH, web::get().to(ferivonus_spec))
         .route(UI_PATH, web::get().to(fer_ui));
 }
-
-// =====================================================================
-// 📄 OPENAPI JSON OLUŞTURUCU (SPEC GENERATOR)
-// =====================================================================
 
 fn parse_openapi_type(field_type: &str) -> serde_json::Value {
     if let Some(inner) = field_type.strip_prefix("array:") {
@@ -362,10 +347,6 @@ pub async fn ferivonus_spec(reg: web::Data<ApiRegistry>) -> impl Responder {
     HttpResponse::Ok().json(doc)
 }
 
-// =====================================================================
-// 🖥️ SWAGGER ARAYÜZÜ (FRONTEND)
-// =====================================================================
-
 pub async fn fer_ui(reg: web::Data<ApiRegistry>) -> impl Responder {
     if !reg.enable_ui {
         return HttpResponse::NotFound().body("Fer-UI Interface is currently disabled.");
@@ -433,10 +414,8 @@ pub async fn fer_ui(reg: web::Data<ApiRegistry>) -> impl Responder {
                     wrapComponents: {
                         responses: (Original, system) => (props) => {
                             const React = system.React;
-                            // State: Hangi sekme aktif?
                             const [activeTab, setActiveTab] = React.useState(null);
 
-                            // Mevcut Response kodlarını ayıkla
                             const responseMap = props.responses;
                             let codes = [];
                             try {
@@ -445,7 +424,6 @@ pub async fn fer_ui(reg: web::Data<ApiRegistry>) -> impl Responder {
                                 }
                             } catch (e) { codes = ["200"]; }
 
-                            // 🚀 OTOMATİK SEÇİM: Açıldığında en mantıklı kodu seç (2xx > ilk kod)
                             React.useEffect(() => {
                                 if (codes.length > 0 && !activeTab) {
                                     const preferred = codes.find(c => c.startsWith('2')) || codes[0];
@@ -453,7 +431,6 @@ pub async fn fer_ui(reg: web::Data<ApiRegistry>) -> impl Responder {
                                 }
                             }, [codes]);
 
-                            // Buton Grubu
                             const tabs = codes.length > 1 ? React.createElement("div", { 
                                 style: { 
                                     display: "flex", gap: "8px", marginBottom: "15px", flexWrap: "wrap", 
@@ -490,7 +467,6 @@ pub async fn fer_ui(reg: web::Data<ApiRegistry>) -> impl Responder {
 
                             const wrapperId = "fer-res-" + Math.random().toString(36).substr(2, 9);
                             
-                            // CSS ile Canlı Yanıtlar (live-responses-table) hariç filtreleme yapıyoruz
                             const css = `
                                 #${wrapperId} .responses-table:not(.live-responses-table) tbody tr.response { display: none !important; }
                                 #${wrapperId} .responses-table:not(.live-responses-table) tbody tr.response[data-code="${activeTab}"] { display: table-row !important; }
@@ -514,7 +490,6 @@ pub async fn fer_ui(reg: web::Data<ApiRegistry>) -> impl Responder {
                     dom_id: '#fer-ui-root',
                     deepLinking: true,
                     presets: [ SwaggerUIBundle.presets.apis ],
-                    // 🐛 FIX: Modellerin hem listelenmesi hem de içeriklerinin açık gelmesi için:
                     defaultModelsExpandDepth: 1,
                     defaultModelExpandDepth: 1, 
                     docExpansion: "list",

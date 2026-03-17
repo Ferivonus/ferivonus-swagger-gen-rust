@@ -6,10 +6,6 @@ use syn::{
     parse_macro_input,
 };
 
-// =====================================================================
-// 📦 ARGÜMAN PARSER SİSTEMİ
-// =====================================================================
-
 struct RegisterArgs {
     summary: String,
     params: Vec<(String, String)>,
@@ -62,7 +58,7 @@ impl Parse for RegisterArgs {
                         }
                     }
                 }
-                _ => {} // Bilinmeyen parametreleri yut
+                _ => {}
             }
 
             if input.peek(Token![,]) {
@@ -70,7 +66,6 @@ impl Parse for RegisterArgs {
             }
         }
 
-        // Otomatik Hata Yanıtları Mekanizması
         let responses = if overload_responses.is_empty() {
             let success_model = response_model.unwrap_or_else(|| "string".to_string());
             vec![
@@ -84,7 +79,6 @@ impl Parse for RegisterArgs {
             overload_responses
         };
 
-        // Eğer kullanıcı kategori girmezse
         if tags.is_empty() {
             tags.push("Default".to_string());
         }
@@ -100,10 +94,6 @@ impl Parse for RegisterArgs {
     }
 }
 
-// =====================================================================
-// 🚀 ENDPOINT KAYIT MAKROSU (register_api)
-// =====================================================================
-
 #[proc_macro_attribute]
 pub fn register_api(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(attr as RegisterArgs);
@@ -112,7 +102,6 @@ pub fn register_api(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut extracted_path = format!("/{}", input.sig.ident);
     let mut extracted_method = "GET".to_string();
 
-    // Actix-Web routing attributelarını (#[get("/...")]) çözümle
     for attr in &input.attrs {
         if let syn::Meta::List(meta) = &attr.meta {
             if let Some(ident) = meta.path.get_ident() {
@@ -164,13 +153,8 @@ pub fn register_api(attr: TokenStream, item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-// =====================================================================
-// 🔍 RUST TİPLERİNİ OPENAPI TİPLERİNE ÇEVİRME (TYPE PARSER)
-// =====================================================================
-
 fn parse_type(ty: &syn::Type) -> String {
     match ty {
-        // Normal (Owned) Tipler (Örn: String, i32, Option<T>)
         syn::Type::Path(type_path) => {
             if let Some(segment) = type_path.path.segments.last() {
                 let rust_type = segment.ident.to_string();
@@ -201,18 +185,10 @@ fn parse_type(ty: &syn::Type) -> String {
             }
             "string".to_string()
         }
-        // BUG FIX: Referans Tipler (Örn: &str, &String)
-        syn::Type::Reference(type_ref) => {
-            // Referansın içindeki asıl tipi bulup özyineli olarak gönder
-            parse_type(&type_ref.elem)
-        }
+        syn::Type::Reference(type_ref) => parse_type(&type_ref.elem),
         _ => "string".to_string(),
     }
 }
-
-// =====================================================================
-// 🧩 STRUCT VE ENUM ŞEMA ÇIKARICI (derive_api_schema)
-// =====================================================================
 
 #[proc_macro_derive(ApiSchema)]
 pub fn derive_api_schema(input: TokenStream) -> TokenStream {
@@ -224,29 +200,23 @@ pub fn derive_api_schema(input: TokenStream) -> TokenStream {
     let mut fields = Vec::new();
 
     match &input.data {
-        // EĞER GELEN BİR STRUCT İSE
-        syn::Data::Struct(data) => {
-            match &data.fields {
-                // Klasik İsimli Struct: struct User { name: String }
-                syn::Fields::Named(named_fields) => {
-                    for field in &named_fields.named {
-                        let field_name = field.ident.as_ref().unwrap().to_string();
-                        let field_type = parse_type(&field.ty);
-                        fields.push(quote! { (#field_name, #field_type) });
-                    }
+        syn::Data::Struct(data) => match &data.fields {
+            syn::Fields::Named(named_fields) => {
+                for field in &named_fields.named {
+                    let field_name = field.ident.as_ref().unwrap().to_string();
+                    let field_type = parse_type(&field.ty);
+                    fields.push(quote! { (#field_name, #field_type) });
                 }
-                // BUG FIX: İsimsiz (Tuple) Struct: struct Wrapper(String, i32)
-                syn::Fields::Unnamed(unnamed_fields) => {
-                    for (i, field) in unnamed_fields.unnamed.iter().enumerate() {
-                        let field_name = format!("field_{}", i);
-                        let field_type = parse_type(&field.ty);
-                        fields.push(quote! { (#field_name, #field_type) });
-                    }
-                }
-                syn::Fields::Unit => {} // struct Empty; gibi yapılar (Boş)
             }
-        }
-        // EĞER GELEN BİR ENUM İSE
+            syn::Fields::Unnamed(unnamed_fields) => {
+                for (i, field) in unnamed_fields.unnamed.iter().enumerate() {
+                    let field_name = format!("field_{}", i);
+                    let field_type = parse_type(&field.ty);
+                    fields.push(quote! { (#field_name, #field_type) });
+                }
+            }
+            syn::Fields::Unit => {}
+        },
         syn::Data::Enum(data) => {
             is_enum = true;
             for variant in &data.variants {
