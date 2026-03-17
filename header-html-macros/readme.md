@@ -26,5 +26,5 @@ This crate is a dependency of `ferivonus-swagger-gen`. To use the documentation 
 
 ```toml
 [dependencies]
-ferivonus-swagger-gen = "0.1.3"
+ferivonus-swagger-gen = "0.1.4"
 ```
