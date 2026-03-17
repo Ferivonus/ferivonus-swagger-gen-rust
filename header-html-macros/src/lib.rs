@@ -52,21 +52,15 @@ pub fn register_api(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(attr as RegisterArgs);
     let input = parse_macro_input!(item as ItemFn);
 
-    // Varsayilan degerler (eger ustunde get/post yoksa fonksiyon adini kullanir)
     let mut extracted_path = format!("/{}", input.sig.ident);
     let mut extracted_method = "GET".to_string();
 
-    // Actix makrolarini (#[get("/yol")]) tarayip gercek yolu ve metodu buluyoruz
     for attr in &input.attrs {
         if let syn::Meta::List(meta) = &attr.meta {
             if let Some(ident) = meta.path.get_ident() {
                 let method_name = ident.to_string().to_uppercase();
-
-                // Desteklenen HTTP metodlari
                 if ["GET", "POST", "PUT", "DELETE", "PATCH"].contains(&method_name.as_str()) {
                     extracted_method = method_name;
-
-                    // Icerideki ("...") stringini cekiyoruz
                     if let Ok(lit) = meta.parse_args::<syn::LitStr>() {
                         extracted_path = lit.value();
                     }
@@ -84,9 +78,9 @@ pub fn register_api(attr: TokenStream, item: TokenStream) -> TokenStream {
         #input
 
         inventory::submit! {
-            header_html::RoutePlugin {
-                path: #extracted_path, // Artik gercek Actix yolunu aliyor
-                method: #extracted_method, // GET, POST vs. otomatik aliniyor
+            ferivonus_swagger_gen::RoutePlugin {
+                path: #extracted_path,
+                method: #extracted_method,
                 summary: #summary,
                 response_type: #r_type,
                 params: &[ #( (#param_names, #param_types) ),* ],

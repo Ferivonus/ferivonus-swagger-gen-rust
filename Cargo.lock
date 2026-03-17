@@ -417,6 +417,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferivonus-macros"
+version = "0.1.1"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "ferivonus-swagger-gen"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "ferivonus-macros",
+ "inventory",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "find-msvc-tools"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -529,25 +548,6 @@ name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
-
-[[package]]
-name = "header-html"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "header-html-macros",
- "inventory",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "header-html-macros"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn",
-]
 
 [[package]]
 name = "http"

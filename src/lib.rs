@@ -2,8 +2,7 @@ use actix_web::{HttpResponse, Responder, web};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
-pub use header_html_macros::register_api;
-
+pub use ferivonus_macros::register_api;
 pub const UI_PATH: &str = "/fer-ui/";
 pub const SPEC_PATH: &str = "/ferivonus.json";
 
