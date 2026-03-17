@@ -1,0 +1,1 @@
+# ferivonus-swagger-gen-rust
