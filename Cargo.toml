@@ -1,6 +1,6 @@
 [package]
 name = "ferivonus-swagger-gen"
-version = "0.2.0"
+version = "0.2.2"
 edition = "2024"
 description = "Automated, zero-configuration Swagger and OpenAPI documentation engine for Actix-web."
 license = "MIT"

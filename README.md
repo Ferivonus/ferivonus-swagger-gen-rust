@@ -20,7 +20,7 @@ Add the following to your Cargo.toml file:
 [dependencies]
 actix-web = "4"
 serde = { version = "1.0", features = ["derive"] }
-ferivonus-swagger-gen = "0.2.0"
+ferivonus-swagger-gen = "0.2.2"
 ```
 
 ## Technical Architecture
