@@ -450,7 +450,7 @@ dependencies = [
 
 [[package]]
 name = "ferivonus-macros"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "quote",
  "syn",
@@ -458,7 +458,7 @@ dependencies = [
 
 [[package]]
 name = "ferivonus-swagger-gen"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "actix-web",
  "ferivonus-macros",
