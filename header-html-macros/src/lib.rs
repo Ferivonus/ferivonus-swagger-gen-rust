@@ -1,3 +1,12 @@
+//! # Ferivonus Macros
+//!
+//! This crate provides the procedural macros for the `ferivonus-swagger-gen` documentation engine.
+//! It handles the compile-time parsing of Actix-web route handlers and automatically generates
+//! the `inventory::submit!` blocks required to register API metadata globally.
+//!
+//! This crate is generally not intended to be explicitly imported by end-users. Its macros
+//! are re-exported by the main `ferivonus-swagger-gen` crate.
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
@@ -6,6 +15,7 @@ use syn::{
     parse_macro_input,
 };
 
+/// Internal structure to hold the parsed arguments from the `#[register_api(...)]` attribute.
 struct RegisterArgs {
     summary: String,
     response_type: String,
@@ -47,14 +57,37 @@ impl Parse for RegisterArgs {
     }
 }
 
+/// Registers an Actix-web route handler into the Ferivonus OpenAPI documentation engine.
+///
+/// This procedural macro inspects the attached function and its Actix routing attributes
+/// (such as `#[get(...)]` or `#[post(...)]`) to extract the HTTP method and endpoint path.
+/// It then generates an `inventory::submit!` call to register this metadata into the
+/// global `ApiRegistry` at compile time.
+///
+/// # Arguments
+///
+/// * `summary` - A brief description of the endpoint's functionality. This acts as the title in the Swagger UI.
+/// * `params` - A comma-separated list of query parameters in `name:type` format (e.g., `"id:integer, q:string"`).
+/// * `response_type` - The expected MIME type of the response. Defaults to `"application/json"`.
+///
+/// # Example
+/// ```ignore
+/// #[register_api(summary = "Retrieve user details", params = "user_id:integer")]
+/// #[get("/users/detail")]
+/// async fn get_user_detail(query: web::Query<UserQuery>) -> impl Responder {
+///     // Implementation here
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn register_api(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(attr as RegisterArgs);
     let input = parse_macro_input!(item as ItemFn);
 
+    // Default fallbacks for path and method extraction
     let mut extracted_path = format!("/{}", input.sig.ident);
     let mut extracted_method = "GET".to_string();
 
+    // Iterate through the function attributes to find Actix-web routing macros
     for attr in &input.attrs {
         if let syn::Meta::List(meta) = &attr.meta {
             if let Some(ident) = meta.path.get_ident() {
@@ -87,5 +120,6 @@ pub fn register_api(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
     };
+
     TokenStream::from(expanded)
 }
