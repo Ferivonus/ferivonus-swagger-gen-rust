@@ -4,10 +4,6 @@ use actix_web::{
 use ferivonus_swagger_gen::{ApiRegistry, ApiSchema, ferivonus_config, register_api};
 use serde::{Deserialize, Serialize};
 
-// =====================================================================
-// 📦 1. VERİ MODELLERİ (SCHEMAS)
-// =====================================================================
-
 #[derive(Serialize, Deserialize, Clone, ApiSchema)]
 enum Role {
     Admin,
@@ -40,14 +36,9 @@ struct ErrorResponse {
     message: String,
 }
 
-// =====================================================================
-// 🛡️ 2. SİSTEM & SAĞLIK KONTROLÜ (SYSTEM ROUTES)
-// =====================================================================
-
 #[register_api(
     summary = "Sistemin ayakta olup olmadığını kontrol eder",
     tags = "Sistem",
-    // Overload ile sadece 200 dönmesini sağlıyoruz, hata beklemiyoruz.
     overload_responses = "200:string"
 )]
 #[get("/health")]
@@ -55,14 +46,10 @@ async fn health_check() -> impl Responder {
     HttpResponse::Ok().body("Ferivonus Engine is up and running! 🚀")
 }
 
-// =====================================================================
-// 👑 3. ADMİN İŞLEMLERİ (ADMIN ROUTES - KORUMALI)
-// =====================================================================
-
 #[register_api(
     summary = "Sistem yöneticisinin profilini getirir",
     tags = "Admin İşlemleri",
-    security = "Bearer", // 🔒 KİLİTLİ
+    security = "Bearer",
     response_model = "UserResponse"
 )]
 #[get("/users/admin")]
@@ -87,8 +74,8 @@ async fn get_admin_profile(req: HttpRequest) -> impl Responder {
 #[register_api(
     summary = "Kullanıcıyı sistemden siler (Sadece Admin)",
     tags = "Admin İşlemleri",
-    security = "Bearer", // 🔒 KİLİTLİ
-    params = "id:integer", // 📌 PATH PARAMETRESİ
+    security = "Bearer",
+    params = "id:integer",
     overload_responses = "204:string, 401:ErrorResponse, 404:ErrorResponse"
 )]
 #[delete("/users/{id}")]
@@ -106,13 +93,8 @@ async fn delete_user(path: web::Path<u32>, req: HttpRequest) -> impl Responder {
     let user_id = path.into_inner();
     println!("🗑️ Kullanıcı silindi. ID: {}", user_id);
 
-    // 204 No Content -> Başarılı ama içerik dönmeye gerek yok
     HttpResponse::NoContent().finish()
 }
-
-// =====================================================================
-// 👥 4. KULLANICI İŞLEMLERİ (USER ROUTES - HALKA AÇIK)
-// =====================================================================
 
 #[derive(Deserialize)]
 struct PaginationQuery {
@@ -122,7 +104,7 @@ struct PaginationQuery {
 #[register_api(
     summary = "Tüm kullanıcıları listeler (Sayfalamalı)",
     tags = "Kullanıcı İşlemleri",
-    params = "limit:integer", // 🔍 QUERY PARAMETRESİ
+    params = "limit:integer",
     overload_responses = "200:string"
 )]
 #[get("/users")]
@@ -130,21 +112,19 @@ async fn list_users(query: web::Query<PaginationQuery>) -> impl Responder {
     let limit = query.limit.unwrap_or(10);
     println!("📋 {} adet kullanıcı listeleniyor...", limit);
 
-    // Basitlik adına JSON array yerine mesaj dönüyoruz
     HttpResponse::Ok().body(format!("{} adet kullanıcı başarıyla getirildi.", limit))
 }
 
 #[register_api(
     summary = "ID'ye göre kullanıcı detayını getirir",
     tags = "Kullanıcı İşlemleri",
-    params = "id:integer", // 📌 PATH PARAMETRESİ
+    params = "id:integer",
     response_model = "UserResponse"
 )]
 #[get("/users/{id}")]
 async fn get_user(path: web::Path<u32>) -> impl Responder {
     let user_id = path.into_inner();
 
-    // Örnek: Eğer ID 0 gelirse 404 dön
     if user_id == 0 {
         return HttpResponse::NotFound().json(ErrorResponse {
             error_code: "NOT_FOUND".to_string(),
@@ -175,7 +155,7 @@ async fn create_user(body: web::Json<UserCreateRequest>) -> impl Responder {
     }
 
     HttpResponse::Created().json(UserResponse {
-        id: 101, // Mock ID
+        id: 101,
         username: body.username.clone(),
         role: body.role.clone(),
     })
@@ -184,7 +164,7 @@ async fn create_user(body: web::Json<UserCreateRequest>) -> impl Responder {
 #[register_api(
     summary = "Kullanıcının rolünü günceller",
     tags = "Kullanıcı İşlemleri",
-    params = "id:integer", // 📌 PATH PARAMETRESİ
+    params = "id:integer",
     request_body = "UserUpdateRequest",
     response_model = "UserResponse"
 )]
@@ -204,15 +184,10 @@ async fn update_user_role(
     })
 }
 
-// =====================================================================
-// 🚀 5. SUNUCU BAŞLATMA (SERVER ENTRY POINT)
-// =====================================================================
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let addr = "127.0.0.1:8080";
 
-    // Registry başlatılıyor (Inventory ile toplanan rotalar JSON'a çevrilir)
     let registry = ApiRegistry::new();
     registry.print_startup_info(addr);
 
@@ -221,14 +196,10 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(registry_data.clone())
-            // Swagger ve JSON Rotaları
             .configure(ferivonus_config)
-            // Sistem Rotaları
             .service(health_check)
-            // Admin Rotaları
             .service(get_admin_profile)
             .service(delete_user)
-            // Kullanıcı Rotaları
             .service(list_users)
             .service(get_user)
             .service(create_user)
